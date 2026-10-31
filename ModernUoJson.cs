@@ -36,6 +36,13 @@ public static class ModernUoJson
         "GuardedRegion", "JailRegion", "GreenAcresRegion",
     };
 
+    // keys with first-class RegionDef properties; everything else lands in MuoExtra verbatim
+    static readonly HashSet<string> MappedKeys = new(StringComparer.Ordinal)
+    {
+        "$type", "Map", "Name", "Priority", "Area", "GoLocation", "Music",
+        "RuneName", "NoLogoutDelay", "Entrance",
+    };
+
     public static string Export(IEnumerable<RegionDef> regions)
     {
         var opts = new JsonWriterOptions { Indented = true };
@@ -68,6 +75,23 @@ public static class ModernUoJson
                 w.WriteNumber("z", r.PZ);
                 w.WriteEndObject();
                 if (!string.IsNullOrWhiteSpace(r.Music)) w.WriteString("Music", r.Music.Trim());
+                if (!string.IsNullOrWhiteSpace(r.RuneName)) w.WriteString("RuneName", r.RuneName.Trim());
+                if (r.NoLogoutDelay) w.WriteBoolean("NoLogoutDelay", true);
+                if (r.EX >= 0 && r.EY >= 0)
+                {
+                    w.WriteStartObject("Entrance");
+                    w.WriteNumber("x", r.EX);
+                    w.WriteNumber("y", r.EY);
+                    w.WriteNumber("z", r.EZ);
+                    w.WriteEndObject();
+                }
+                if (r.MuoExtra != null)
+                    foreach (var (k, v) in r.MuoExtra)
+                    {
+                        if (MappedKeys.Contains(k)) continue;   // first-class fields win
+                        w.WritePropertyName(k);
+                        v.WriteTo(w);
+                    }
                 w.WriteEndObject();
             }
             w.WriteEndArray();
@@ -96,6 +120,8 @@ public static class ModernUoJson
                 DefName = MakeDefName(name, res),
                 ServuoType = Str(el, "$type") ?? "",
                 Music = Str(el, "Music") ?? "",
+                RuneName = Str(el, "RuneName") ?? "",
+                NoLogoutDelay = el.TryGetProperty("NoLogoutDelay", out var nld) && nld.ValueKind == JsonValueKind.True,
                 Priority = el.TryGetProperty("Priority", out var pe) && pe.TryGetInt32(out var pv) ? pv : 50,
                 MapPlane = Math.Max(0, Array.FindIndex(Facets,
                     f => f.Equals(Str(el, "Map") ?? "", StringComparison.OrdinalIgnoreCase))),
@@ -112,6 +138,15 @@ public static class ModernUoJson
             if (el.TryGetProperty("GoLocation", out var go) && go.ValueKind == JsonValueKind.Object)
             {
                 r.PX = Int(go, "x"); r.PY = Int(go, "y"); r.PZ = Int(go, "z");
+            }
+            if (el.TryGetProperty("Entrance", out var ent) && ent.ValueKind == JsonValueKind.Object)
+            {
+                r.EX = Int(ent, "x"); r.EY = Int(ent, "y"); r.EZ = Int(ent, "z");
+            }
+            foreach (var prop in el.EnumerateObject())
+            {
+                if (MappedKeys.Contains(prop.Name)) continue;
+                (r.MuoExtra ??= new())[prop.Name] = prop.Value.Clone();   // Clone: detach from the disposed doc
             }
             if (r.Rects.Count > 0) res.Add(r);
         }

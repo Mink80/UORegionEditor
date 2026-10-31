@@ -460,6 +460,46 @@ static class Program
                     ServuoXml.RegionTypes.Contains("MondainRegion"),
                     $"{ModernUoJson.RegionTypes.Length} modernuo / {ServuoXml.RegionTypes.Length} servuo");
 
+                // 8b2. the UO-Sagas field set: RuneName/Entrance/NoLogoutDelay round-trip,
+                // and keys this editor does NOT know are preserved verbatim (MuoExtra)
+                var sagas = """
+                    [{
+                      "$type": "CrematoriumLvl1Region",
+                      "Area": [{"x1": 100, "y1": 100, "x2": 121, "y2": 121}],
+                      "GoLocation": {"x": 110, "y": 110, "z": 0},
+                      "Map": "Felucca",
+                      "Name": "Crematorium",
+                      "Priority": 60,
+                      "NoLogoutDelay": true,
+                      "RuneName": "the Crematorium",
+                      "Entrance": {"x": 105, "y": 106, "z": -5},
+                      "SpawnZLevel": 42,
+                      "Guards": {"Type": "Archer", "Count": 3}
+                    }]
+                    """;
+                var sg = ModernUoJson.Import(sagas);
+                Check("modernuo sagas fields import",
+                    sg.Count == 1 && sg[0].RuneName == "the Crematorium" && sg[0].NoLogoutDelay &&
+                    sg[0].EX == 105 && sg[0].EY == 106 && sg[0].EZ == -5 &&
+                    sg[0].ServuoType == "CrematoriumLvl1Region",
+                    sg.Count == 0 ? "no regions" : $"rune={sg[0].RuneName} ent={sg[0].EX},{sg[0].EY},{sg[0].EZ}");
+                Check("modernuo unknown fields preserved",
+                    sg.Count == 1 && sg[0].MuoExtra is { Count: 2 } &&
+                    sg[0].MuoExtra.ContainsKey("SpawnZLevel") && sg[0].MuoExtra.ContainsKey("Guards"));
+                var sgJson = ModernUoJson.Export(sg);
+                var sg2 = ModernUoJson.Import(sgJson);
+                Check("modernuo sagas round-trip",
+                    sg2.Count == 1 && sg2[0].RuneName == "the Crematorium" && sg2[0].NoLogoutDelay &&
+                    sg2[0].EX == 105 && sg2[0].EY == 106 && sg2[0].EZ == -5 &&
+                    sg2[0].MuoExtra is { Count: 2 } &&
+                    sg2[0].MuoExtra["SpawnZLevel"].GetInt32() == 42 &&
+                    sg2[0].MuoExtra["Guards"].GetProperty("Count").GetInt32() == 3,
+                    sgJson.Length > 400 ? sgJson.Substring(0, 400) : sgJson);
+                // absent stays absent: no Entrance/NoLogoutDelay/RuneName keys invented
+                Check("modernuo absent extras stay absent",
+                    !bareJson.Contains("Entrance") && !bareJson.Contains("NoLogoutDelay") &&
+                    !bareJson.Contains("RuneName"));
+
                 // profiles saved before the shard setting existed have no Target at all,
                 // and those are Sphere shards - they must not land on ServUO
                 Check("shard target from profile name",
