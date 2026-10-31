@@ -21,6 +21,7 @@ public class UndoManager
         public DateTime At;
         public Dictionary<Guid, RegionDef> Before = new();   // uid -> clone, or null if it did not exist
         public List<string> ExtraSectionsBefore;             // null = untouched by this op
+        public List<Guid> OrderBefore;                       // null = this op did not change the list order
     }
 
     readonly List<Op> undo = new();
@@ -38,7 +39,7 @@ public class UndoManager
     // about to be created, pass the new object BEFORE adding it to the project - its "before"
     // state is recorded as absent). coalesceKey groups rapid same-kind edits into one step.
     public void Snapshot(string desc, Project p, IEnumerable<RegionDef> affected,
-        bool includeExtraSections = false, string coalesceKey = null)
+        bool includeExtraSections = false, string coalesceKey = null, bool includeOrder = false)
     {
         if (coalesceKey != null && coalesceKey == lastCoalesceKey &&
             (DateTime.Now - lastCoalesceAt).TotalSeconds < 2.0)
@@ -56,6 +57,7 @@ public class UndoManager
             op.Before[r.Uid] = p.Regions.Any(x => x.Uid == r.Uid) ? Clone(r) : null;
         }
         if (includeExtraSections) op.ExtraSectionsBefore = new List<string>(p.ExtraSections);
+        if (includeOrder) op.OrderBefore = p.Regions.Select(r => r.Uid).ToList();
         undo.Add(op);
         if (undo.Count > MaxDepth) undo.RemoveAt(0);
         redo.Clear();
@@ -70,22 +72,29 @@ public class UndoManager
     public IEnumerable<string> History =>
         Enumerable.Range(0, undo.Count).Select(i => $"{undo[undo.Count - 1 - i].At:HH:mm:ss}  {undo[undo.Count - 1 - i].Desc}");
 
+    // true after an Undo/Redo whose operation restored the region list ORDER (drag-reorder):
+    // the caller then pushes the full order to the server, not individual regions.
+    public bool LastRestoredOrder { get; private set; }
+
     public List<UndoResult> Undo(Project p)
     {
-        var r = Apply(p, undo, redo);
+        var r = Apply(p, undo, redo, out var ord);
+        LastRestoredOrder = ord;
         if (r != null) { lastCoalesceKey = null; Changed?.Invoke(); }
         return r;
     }
 
     public List<UndoResult> Redo(Project p)
     {
-        var r = Apply(p, redo, undo);
+        var r = Apply(p, redo, undo, out var ord);
+        LastRestoredOrder = ord;
         if (r != null) { lastCoalesceKey = null; Changed?.Invoke(); }
         return r;
     }
 
-    static List<UndoResult> Apply(Project p, List<Op> from, List<Op> to)
+    static List<UndoResult> Apply(Project p, List<Op> from, List<Op> to, out bool orderRestored)
     {
+        orderRestored = false;
         if (from.Count == 0) return null;
         var op = from[^1];
         from.RemoveAt(from.Count - 1);
@@ -98,6 +107,7 @@ public class UndoManager
             inverse.Before[uid] = Clone(cur);
         }
         if (op.ExtraSectionsBefore != null) inverse.ExtraSectionsBefore = new List<string>(p.ExtraSections);
+        if (op.OrderBefore != null) inverse.OrderBefore = p.Regions.Select(r => r.Uid).ToList();
         to.Add(inverse);
 
         var results = new List<UndoResult>();
@@ -120,6 +130,17 @@ public class UndoManager
             results.Add(res);
         }
         if (op.ExtraSectionsBefore != null) p.ExtraSections = new List<string>(op.ExtraSectionsBefore);
+        if (op.OrderBefore != null)
+        {
+            // restore the list order for the uids the snapshot knows; regions created since
+            // (e.g. by a teammate) keep their relative order at the end. OrderBy is stable.
+            var pos = new Dictionary<Guid, int>();
+            for (int k = 0; k < op.OrderBefore.Count; k++) pos[op.OrderBefore[k]] = k;
+            var sorted = p.Regions.OrderBy(r => pos.TryGetValue(r.Uid, out var k) ? k : int.MaxValue).ToList();
+            p.Regions.Clear();
+            p.Regions.AddRange(sorted);
+            orderRestored = true;
+        }
         return results;
     }
 

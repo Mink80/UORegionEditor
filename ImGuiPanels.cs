@@ -721,6 +721,8 @@ public partial class ImGuiApp
                                 if (from >= 0 && from != i)
                                 {
                                     var moved = project.Regions[from];
+                                    undoMgr.Snapshot($"move {moved.DefName} in list", project,
+                                        Array.Empty<RegionDef>(), includeOrder: true);
                                     project.Regions.RemoveAt(from);
                                     // dragging down lands after this row, dragging up before it
                                     project.Regions.Insert(Math.Min(i, project.Regions.Count), moved);
