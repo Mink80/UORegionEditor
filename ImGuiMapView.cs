@@ -1079,9 +1079,9 @@ public partial class ImGuiApp
         // which keeps its own undo, and never mid-drag
         if (!io.WantTextInput && drag == Drag.None)
         {
-            if (CtrlHeld && KeyHit(Silk.NET.Input.Key.Z) && !ShiftHeld) DoUndo();
-            if ((CtrlHeld && KeyHit(Silk.NET.Input.Key.Y)) ||
-                (CtrlHeld && ShiftHeld && KeyHit(Silk.NET.Input.Key.Z)))
+            if (CtrlHeld && KeyHit(undoKey) && !ShiftHeld) DoUndo();
+            if ((CtrlHeld && KeyHit(redoKey)) ||
+                (CtrlHeld && ShiftHeld && KeyHit(undoKey)))
                 DoRedo();
         }
 

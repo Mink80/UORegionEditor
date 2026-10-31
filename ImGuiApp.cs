@@ -99,6 +99,10 @@ public partial class ImGuiApp
     readonly HashSet<Silk.NET.Input.Key> keysPressed = new();
     bool KeyHeld(Silk.NET.Input.Key k) { lock (keysDown) return keysDown.Contains(k); }
     bool KeyHit(Silk.NET.Input.Key k) { lock (keysDown) return keysPressed.Contains(k); }
+    // Silk/GLFW report PHYSICAL key positions (US layout): on QWERTZ the keys labeled
+    // Z and Y are swapped, on AZERTY "z" sits on the US W. Resolved from the real
+    // layout in OnLoad so Ctrl+Z / Ctrl+Y mean the labels the user actually sees.
+    Silk.NET.Input.Key undoKey = Silk.NET.Input.Key.Z, redoKey = Silk.NET.Input.Key.Y;
     bool CtrlHeld => KeyHeld(Silk.NET.Input.Key.ControlLeft) || KeyHeld(Silk.NET.Input.Key.ControlRight);
     bool ShiftHeld => KeyHeld(Silk.NET.Input.Key.ShiftLeft) || KeyHeld(Silk.NET.Input.Key.ShiftRight);
 
@@ -382,6 +386,19 @@ public partial class ImGuiApp
             kb.KeyDown += (_, key, _) => { lock (keysDown) { keysDown.Add(key); keysPressed.Add(key); } };
             kb.KeyUp += (_, key, _) => { lock (keysDown) keysDown.Remove(key); };
         }
+
+        try
+        {
+            // find the physical keys whose printed label is "z" / "y" on this layout
+            var glfw = Silk.NET.GLFW.GlfwProvider.GLFW.Value;
+            for (var k = Silk.NET.Input.Key.A; k <= Silk.NET.Input.Key.Z; k++)
+            {
+                var name = glfw.GetKeyName((int)k, 0);
+                if (string.Equals(name, "z", StringComparison.OrdinalIgnoreCase)) undoKey = k;
+                else if (string.Equals(name, "y", StringComparison.OrdinalIgnoreCase)) redoKey = k;
+            }
+        }
+        catch { /* non-GLFW backend or no layout info: keep the US defaults */ }
 
         try
         {
