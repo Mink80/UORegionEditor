@@ -844,7 +844,7 @@ public partial class ImGuiApp
             // rewrite (BaseRegion, JailRegion...) and ServUO-only classes fail to load there
             bool muo = scriptTarget == 3;
             PropTextPick("Type", "servuotype", r, () => r.ServuoType, v => r.ServuoType = v,
-                ',', multi: false, () => muo ? ModernUoJson.RegionTypes : ServuoXml.RegionTypes);
+                ',', multi: false, () => muo ? MuoTypeOptions() : ServuoXml.RegionTypes);
             if (ImGui.IsItemHovered())
                 TooltipLines(muo ? "Region class ModernUO creates" : "Region class ServUO creates",
                     muo ? "(blank = BaseRegion)" : "(blank = plain region)");
@@ -858,6 +858,57 @@ public partial class ImGuiApp
             }
             if (ImGui.IsItemHovered()) TooltipLines("Higher wins where regions overlap");
             PropText("Music", "music", r, () => r.Music, v => r.Music = v);
+            if (muo)
+            {
+                PropText("RuneName", "runename", r, () => r.RuneName, v => r.RuneName = v);
+                if (ImGui.IsItemHovered()) TooltipLines("What a recall rune marked here is named", "(blank = none)");
+                bool nld = r.NoLogoutDelay;
+                if (ImGui.Checkbox("No logout delay", ref nld))
+                {
+                    SnapshotFor($"edit logout delay of {r.DefName}", r);
+                    r.NoLogoutDelay = nld;
+                    MarkDirty(r);
+                }
+                if (ImGui.IsItemHovered()) TooltipLines("Players here log out instantly, like at an inn");
+
+                // Entrance is a DungeonRegion field, but harmless on other classes (just not read)
+                bool hasEnt = r.EX >= 0 && r.EY >= 0;
+                ImGui.Text(hasEnt ? $"Entrance: {r.EX},{r.EY}" : "Entrance: (none)");
+                if (hasEnt)
+                {
+                    ImGui.SameLine();
+                    int ez = r.EZ;
+                    ImGui.SetNextItemWidth(60);
+                    if (ImGui.InputInt("Z##ez", ref ez, 0))
+                    {
+                        SnapshotFor($"edit entrance z of {r.DefName}", r, $"ez|{r.Uid}");
+                        r.EZ = Math.Clamp(ez, -128, 127);
+                        MarkDirty(r);
+                    }
+                }
+                ImGui.SameLine();
+                if (ImGui.Button("Pick##ent"))
+                {
+                    pickTile = true; pickEntrance = true;
+                    status = "Click on the map to place the Entrance (Esc cancels).";
+                }
+                if (hasEnt)
+                {
+                    ImGui.SameLine();
+                    if (ImGui.Button("none##ent"))
+                    {
+                        SnapshotFor($"clear entrance of {r.DefName}", r);
+                        r.EX = -1; r.EY = -1; r.EZ = 0;
+                        MarkDirty(r);
+                    }
+                }
+
+                if (r.MuoExtra is { Count: > 0 })
+                {
+                    ImGui.TextDisabled($"{r.MuoExtra.Count} unmapped json field(s) kept as-is");
+                    if (ImGui.IsItemHovered()) TooltipLines(r.MuoExtra.Keys.OrderBy(k => k).ToArray());
+                }
+            }
         }
 
         var (px, py) = r.EffectiveP();
@@ -873,7 +924,7 @@ public partial class ImGuiApp
             MarkDirty(r);
         }
         ImGui.SameLine();
-        if (ImGui.Button("Pick P")) { pickTile = true; status = "Click on the map to place P (Esc cancels)."; }
+        if (ImGui.Button("Pick P")) { pickTile = true; pickEntrance = false; status = "Click on the map to place P (Esc cancels)."; }
         ImGui.SameLine();
         if (ImGui.Button("P=auto"))
         {
@@ -936,6 +987,17 @@ public partial class ImGuiApp
 
         ImGui.End();
     }
+
+    // ModernUO $type picker: the stock classes plus every class the loaded project already
+    // uses - custom shard classes (OrcFortRegion...) appear after being typed once anywhere
+    IEnumerable<string> MuoTypeOptions() =>
+        ModernUoJson.RegionTypes
+            .Concat(project.Regions.Select(x => x.ServuoType))
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     void PropText(string label, string field, RegionDef r, Func<string> get, Action<string> set)
     {
@@ -1230,7 +1292,7 @@ public partial class ImGuiApp
                 $"quick select: {wandMask.Count:N0} tiles - click to erase from {selReg.DefName}",
             _ => null,
         };
-        if (pickTile) hint = "PICK P: click the map (Esc cancels)";
+        if (pickTile) hint = pickEntrance ? "PICK ENTRANCE: click the map (Esc cancels)" : "PICK P: click the map (Esc cancels)";
         // CentrED shows what's under the cursor AS RENDERED: with the item glow active
         // the bar reports the picked item's own tile/Z/id ("Object <x,y,z>" style);
         // otherwise the hovered tile with its top visible surface Z (filter-aware)

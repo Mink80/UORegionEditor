@@ -68,6 +68,16 @@ public class RegionDef
     public string ServuoType { get; set; } = "";     // TownRegion, GuardedRegion, DungeonRegion...
     public int Priority { get; set; } = 50;
     public string Music { get; set; } = "";          // <music name="Britain1"/>
+    // ModernUO regions.json extras (BaseRegion/DungeonRegion fields), ignored by the
+    // other exports the same way. EX < 0 = no Entrance (PX/PY-style sentinel).
+    public string RuneName { get; set; } = "";
+    public bool NoLogoutDelay { get; set; }
+    public int EX { get; set; } = -1;
+    public int EY { get; set; } = -1;
+    public int EZ { get; set; } = 0;
+    // unmapped ModernUO json keys, kept verbatim so a round-trip never loses fields
+    // this editor does not know (future ModernUO additions, custom region properties)
+    public Dictionary<string, System.Text.Json.JsonElement> MuoExtra { get; set; }
     public List<RegionRect> Rects { get; set; } = new();
     public int ColorArgb { get; set; }
     public bool Visible { get; set; } = true;

@@ -63,6 +63,7 @@ public partial class ImGuiApp
 
     bool scrollListToSel;                 // Regions list scrolls to the selection picked on the map
     bool pickTile;
+    bool pickEntrance;   // while pickTile: the click places the ModernUO Entrance, not P
 
     static readonly (Silk.NET.Input.Key key, Mode m)[] ToolKeys =
     {
@@ -1070,6 +1071,7 @@ public partial class ImGuiApp
             if (KeyHit(Silk.NET.Input.Key.P) && selReg != null && drag == Drag.None)
             {
                 pickTile = true;
+                pickEntrance = false;
                 status = "Click on the map to place P (Esc cancels).";
             }
         }
@@ -1153,7 +1155,17 @@ public partial class ImGuiApp
         if (pickTile)
         {
             pickTile = false;
-            if (selReg != null)
+            if (selReg != null && pickEntrance)
+            {
+                SnapshotFor($"set entrance of {selReg.DefName}", selReg);
+                selReg.EX = tile.x;
+                selReg.EY = tile.y;
+                if (artView != null) selReg.EZ = artView.LandZAt(tile.x, tile.y);
+                else if (sharedMapData != null) selReg.EZ = sharedMapData.LandAt(tile.x, tile.y).z;
+                MarkDirty(selReg);
+                status = $"Entrance set to {tile.x},{tile.y} z{selReg.EZ}";
+            }
+            else if (selReg != null)
             {
                 SnapshotFor($"set P of {selReg.DefName}", selReg);
                 selReg.PX = tile.x;

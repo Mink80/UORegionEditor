@@ -663,6 +663,17 @@ public class ServerCore
         r.ServuoType = r.ServuoType == null ? null : OneLine(r.ServuoType, 64);
         r.Music = r.Music == null ? null : OneLine(r.Music, 64);
         r.Priority = Math.Clamp(r.Priority, 0, 32767);
+        r.RuneName = r.RuneName == null ? null : OneLine(r.RuneName, 64);
+        if (r.EX >= 0 && r.EY >= 0) { r.EX = Math.Clamp(r.EX, 0, mx); r.EY = Math.Clamp(r.EY, 0, my); }
+        else { r.EX = -1; r.EY = -1; }
+        r.EZ = Math.Clamp(r.EZ, -128, 127);
+        if (r.MuoExtra != null)
+        {
+            // opaque ModernUO json passthrough: cap it so a client can't bloat the data file
+            if (r.MuoExtra.Count > 64) return $"too many passthrough json fields ({r.MuoExtra.Count})";
+            int len = System.Text.Json.JsonSerializer.Serialize(r.MuoExtra).Length;
+            if (len > 16384) return $"passthrough json too large ({len} chars)";
+        }
         r.Extra ??= new List<string>();
         if (r.Extra.Count > MaxExtraLines) return $"too many extra lines ({r.Extra.Count})";
         // a network-pushed Extra line that opens a section ("[FUNCTION ...]", "[AREADEF ...]")

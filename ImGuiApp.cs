@@ -1118,6 +1118,10 @@ public partial class ImGuiApp
             DefName = dn, Name = r.Name + " copy", Kind = r.Kind,
             Events = r.Events, Flags = r.Flags, Group = r.Group,
             PX = r.PX, PY = r.PY, PZ = r.PZ, MapPlane = r.MapPlane,
+            ServuoType = r.ServuoType, Priority = r.Priority, Music = r.Music,
+            RuneName = r.RuneName, NoLogoutDelay = r.NoLogoutDelay,
+            EX = r.EX, EY = r.EY, EZ = r.EZ,
+            MuoExtra = r.MuoExtra == null ? null : new(r.MuoExtra),   // JsonElement is immutable
             Extra = new List<string>(r.Extra), Comments = new List<string>(r.Comments),
             Rects = r.Rects.Select(t => t.Clone()).ToList(),
         };
