@@ -1148,11 +1148,15 @@ public partial class ImGuiApp
                 }
             }
         }
+        if (undoMgr.LastRestoredOrder)
+            reorderDirty = true;   // push the restored list order to the server like a manual reorder
         var selUid = selReg?.Uid;
         selReg = selUid == null ? null : project.Regions.FirstOrDefault(r => r.Uid == selUid);
         selRect = selReg?.Rects.Count > 0 ? selReg.Rects[^1] : null;
         foreach (var res in results) dirtyPush.RemoveWhere(r => r.Uid == res.Uid);
-        status = $"{why}: {results.Count} region(s) restored";
+        status = undoMgr.LastRestoredOrder && results.Count == 0
+            ? $"{why}: region list order restored"
+            : $"{why}: {results.Count} region(s) restored";
     }
 
     // ---- network glue -----------------------------------------------------

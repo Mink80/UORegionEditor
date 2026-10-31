@@ -1063,10 +1063,6 @@ public partial class ImGuiApp
             if (KeyHit(Silk.NET.Input.Key.Down)) Nudge(0, step);
             if (KeyHit(Silk.NET.Input.Key.Left)) Nudge(-step, 0);
             if (KeyHit(Silk.NET.Input.Key.Right)) Nudge(step, 0);
-            if (CtrlHeld && KeyHit(Silk.NET.Input.Key.Z) && !ShiftHeld && drag == Drag.None) DoUndo();
-            if ((CtrlHeld && KeyHit(Silk.NET.Input.Key.Y)) ||
-                (CtrlHeld && ShiftHeld && KeyHit(Silk.NET.Input.Key.Z)))
-                if (drag == Drag.None) DoRedo();
             // CentrED-style function-key tool switching (same order as the Tools panel)
             foreach (var (key, m) in ToolKeys)
                 if (KeyHit(key)) SetTool(m);
@@ -1076,6 +1072,17 @@ public partial class ImGuiApp
                 pickTile = true;
                 status = "Click on the map to place P (Esc cancels).";
             }
+        }
+
+        // Ctrl+Z / Ctrl+Y work anywhere in the app (also after a drag in the region list,
+        // which steals ImGui keyboard focus) - but never while typing in a text field,
+        // which keeps its own undo, and never mid-drag
+        if (!io.WantTextInput && drag == Drag.None)
+        {
+            if (CtrlHeld && KeyHit(Silk.NET.Input.Key.Z) && !ShiftHeld) DoUndo();
+            if ((CtrlHeld && KeyHit(Silk.NET.Input.Key.Y)) ||
+                (CtrlHeld && ShiftHeld && KeyHit(Silk.NET.Input.Key.Z)))
+                DoRedo();
         }
 
         if (io.WantCaptureMouse)

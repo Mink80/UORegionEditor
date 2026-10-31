@@ -379,6 +379,29 @@ static class Program
                     res3[0].Now.DefName == "A_MINE");
             }
 
+            // 8.7 list-order undo: a drag-reorder in the region list is one undoable step,
+            // and regions a teammate creates after the snapshot keep their place at the end
+            {
+                var up = new Project();
+                var a = new RegionDef { DefName = "A_FIRST" };
+                var b = new RegionDef { DefName = "A_SECOND" };
+                var c = new RegionDef { DefName = "A_THIRD" };
+                up.Regions.AddRange(new[] { a, b, c });
+                var um = new UndoManager();
+                um.Snapshot("move A_FIRST in list", up, Array.Empty<RegionDef>(), includeOrder: true);
+                up.Regions.RemoveAt(0);
+                up.Regions.Add(a);                                          // A_FIRST dragged to the end
+                var late = new RegionDef { DefName = "A_LATE" };            // teammate creates after my snapshot
+                up.Regions.Add(late);
+                var res = um.Undo(up);
+                Check("undo restores list order", res != null && res.Count == 0 && um.LastRestoredOrder &&
+                    up.Regions[0] == a && up.Regions[1] == b && up.Regions[2] == c);
+                Check("undo keeps teammate's new region", up.Regions[3] == late);
+                um.Redo(up);
+                Check("redo reapplies the reorder", um.LastRestoredOrder &&
+                    up.Regions[0] == b && up.Regions[1] == c && up.Regions[2] == a && up.Regions[3] == late);
+            }
+
             // 8a2. ServUO Regions.xml round-trip (rect width/height <-> inclusive corners)
             {
                 var a = new RegionDef { DefName = "A_SRV", Name = "Srv Town", MapPlane = 0, PX = 100, PY = 110, PZ = 5 };
