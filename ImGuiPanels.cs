@@ -1502,10 +1502,21 @@ public partial class ImGuiApp
         {
             var list = ModernUoJson.Import(File.ReadAllText(dlg.FileName));
             if (list.Count == 0) { status = "No regions found in that file."; return; }
+            foreach (var r in list)
+            {
+                var baseName = r.DefName;
+                for (int n = 2; project.Regions.Any(x => x.DefName.Equals(r.DefName, StringComparison.OrdinalIgnoreCase)); n++)
+                    r.DefName = baseName + "_" + n;
+                r.Color = Palette.Next(project.Regions.Count + list.IndexOf(r));
+            }
             undoMgr.Snapshot($"import {Path.GetFileName(dlg.FileName)}", project, list);
             project.Regions.AddRange(list);
             foreach (var r in list) MarkDirty(r);
-            status = $"Imported {list.Count} regions from ModernUO json.";
+            // a ModernUO file was just imported, so that is the shard being edited for -
+            // without this the ModernUO fields (RuneName, Entrance...) stay hidden
+            bool switched = scriptTarget != 3;
+            if (switched) { scriptTarget = 3; SaveUiSettings(); }
+            status = $"Imported {list.Count} regions from ModernUO json{(switched ? " - now editing for ModernUO" : "")}.";
         }
         catch (Exception ex) { status = "Import failed: " + ex.Message; }
     }
